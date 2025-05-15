@@ -1,6 +1,6 @@
-import {SimpleClient} from "./index";
+import {SimpleClient} from "./index.js";
 import * as fs from "node:fs";
-import {riotToOpenApiPrimitiveObjects} from "./index";
+import {riotToOpenApiPrimitiveObjects} from "./index.js";
 
 export const createPaths = async (client: SimpleClient) => {
     const consoleHelp = await client.request<any>(
@@ -229,7 +229,7 @@ const createType = (some: any) => {
 
     let ref = Object.keys(some)[0];
 
-    if (ref === 0 || ref === "0") {
+    if (ref === "0") {
         ref = "AnyType";
     }
     return {

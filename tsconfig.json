@@ -1,0 +1,12 @@
+{
+  "compilerOptions": {
+    "moduleResolution": "node", // Resolves modules using Node's resolution strategy
+    "esModuleInterop": true, // Allows default imports from CommonJS
+    "module": "ESNext", // or "CommonJS" depending on your setup
+    "target": "ES6", // or higher
+    "outDir": "./dist", // Ensure output is in the "dist" directory
+    "rootDir": "./src", // Source directory
+    "resolveJsonModule": true // If using JSON modules
+  },
+  "include": ["src/**/*.ts"]
+}

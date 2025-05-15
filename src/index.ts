@@ -1,7 +1,7 @@
 import axios from "axios";
 import * as https from "node:https";
-import {createSchema} from "./schemas";
-import {createPaths} from "./paths";
+import {createSchema} from "./schemas.js";
+import {createPaths} from "./paths.js";
 import * as fs from "node:fs";
 
 export const riotToOpenApiPrimitiveObjects = new Map<string, any>();
@@ -70,9 +70,6 @@ async function run() {
         secret
     );
 
-    // const schema = await createSchema(client);
-    // console.log("Schemas loaded successfully");
-
 
     const appInfo = await client.request("GET", "/riotclient/v1/app-info");
 
@@ -119,7 +116,8 @@ async function run() {
         }
     }
 
-    fs.writeFileSync("./dist/openapi.json", JSON.stringify(openApiObject, null, 2));
+    fs.mkdirSync("./out", {recursive: true});
+    fs.writeFileSync("./out/openapi.json", JSON.stringify(openApiObject, null, 2));
 }
 
-await run();
+run();

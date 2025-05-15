@@ -1,5 +1,5 @@
 import * as fs from "node:fs";
-import {riotToOpenApiPrimitiveObjects, SimpleClient} from "./index";
+import {riotToOpenApiPrimitiveObjects, SimpleClient} from "./index.js";
 
 
 interface HelpResponse {
@@ -157,6 +157,7 @@ export const createSchema = async (client: SimpleClient) => {
     const consoleTypes = Object.entries(consoleResponse.types);
     const schemas = someToOpenApiObject(consoleResponse.types);
     schemas.set("AnyType", {
+            // @ts-ignore
             "nullable": true,
             "anyOf": [
                 {
@@ -295,6 +296,7 @@ const handleObject = (value: ConsoleObjectType) => {
         return {[key]: entry};
     })).reduce((acc, curr) => {
         const [key, value] = Object.entries(curr)[0];
+        // @ts-ignore
         acc[key] = value;
         return acc;
     }, {} as Record<string, OpenApiType>);
