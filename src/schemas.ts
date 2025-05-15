@@ -1,4 +1,3 @@
-import * as fs from "node:fs";
 import {riotToOpenApiPrimitiveObjects, SimpleClient} from "./index.js";
 
 
@@ -183,10 +182,7 @@ export const createSchema = async (client: SimpleClient) => {
         }
     )
 
-    fs.mkdirSync("./dist", {recursive: true});
-    const schemaObject = Object.fromEntries(schemas);
-    fs.writeFileSync("./dist/schemas.json", JSON.stringify(schemaObject, null, 2));
-    return schemaObject;
+    return Object.fromEntries(schemas);
 }
 
 type OpenApiPrimitive = {

@@ -7,11 +7,15 @@ import * as fs from "node:fs";
 export const riotToOpenApiPrimitiveObjects = new Map<string, any>();
 riotToOpenApiPrimitiveObjects.set("string", {type: "string"});
 riotToOpenApiPrimitiveObjects.set("int8", {type: "number", format: "int32"});
+riotToOpenApiPrimitiveObjects.set("uint8", {type: "number", format: "int32"});
+riotToOpenApiPrimitiveObjects.set("int16", {type: "number", format: "int32"});
+riotToOpenApiPrimitiveObjects.set("uint16", {type: "number", format: "int32"});
 riotToOpenApiPrimitiveObjects.set("uint32", {type: "number", format: "int32"});
 riotToOpenApiPrimitiveObjects.set("int32", {type: "number", format: "int32"});
 riotToOpenApiPrimitiveObjects.set("uint64", {type: "number", format: "int64"});
 riotToOpenApiPrimitiveObjects.set("int64", {type: "number", format: "int64"});
 riotToOpenApiPrimitiveObjects.set("int", {type: "integer"});
+riotToOpenApiPrimitiveObjects.set("float", {type: "number", format: "double"});
 riotToOpenApiPrimitiveObjects.set("double", {type: "number", format: "double"});
 riotToOpenApiPrimitiveObjects.set("bool", {type: "boolean"});
 riotToOpenApiPrimitiveObjects.set("null", {type: "null"});
@@ -73,9 +77,9 @@ async function run() {
 
     const appInfo = await client.request("GET", "/riotclient/v1/app-info");
 
-    const namePrefix = appInfo["name"];
-    const version = appInfo["version"];
-    const sdkVersion = appInfo["sdkVersion"];
+    const namePrefix = appInfo["name"] ?? "Unknown";
+    const version = appInfo["version"] ?? "Unknown";
+    const sdkVersion = appInfo["sdkVersion"] ?? "Unknown";
 
     const schemas = await createSchema(client);
     const pathsOut = await createPaths(client);
@@ -103,9 +107,6 @@ async function run() {
             responses: {
                 UnauthorizedError: {
                     description: "Missing authentication credentials"
-                },
-                ForbiddenError: {
-                    description: "Wrong authentication credentials"
                 }
             },
             schemas: schemas
@@ -117,7 +118,9 @@ async function run() {
     }
 
     fs.mkdirSync("./out", {recursive: true});
-    fs.writeFileSync("./out/openapi.json", JSON.stringify(openApiObject, null, 2));
+    fs.writeFileSync("./out/openapi.json", JSON.stringify(openApiObject, null, 2), {
+        flag: "w"
+    });
 }
 
 run();

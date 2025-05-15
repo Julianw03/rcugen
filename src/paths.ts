@@ -38,13 +38,21 @@ export const createPaths = async (client: SimpleClient) => {
             entry = someObject[urlString] = {};
         }
 
+        let tags = item.tags.filter((tag => tag !== "$remoting-binding-module" && tag !== "Plugins"));
+        if (tags.length === 0) {
+            tags = ["core-sdk"];
+        }
 
         const httpMethod = assocHelp.http_method.toLowerCase();
         entry[httpMethod] = entry[httpMethod] || {};
-        entry[httpMethod]["description"] = item.description;
+        entry[httpMethod]["tags"] = tags;
+        entry[httpMethod]["description"] = `${item.description} ${item.help ? "\n [Help] " + item.help : ""}`
 
         const responses = {};
         const parameters = [];
+        const deprecated = item.deprecated
+            || (item.description?.toLowerCase()?.includes("deprecated") ?? false)
+            || (item.help?.toLowerCase()?.includes("deprecated") ?? false);
 
         entry[httpMethod]["parameters"] = parameters;
         entry[httpMethod]["responses"] = responses;
@@ -136,14 +144,18 @@ export const createPaths = async (client: SimpleClient) => {
                 entry[httpMethod]["requestBody"] = requestBody;
             }
 
+            if (deprecated) {
+                entry[httpMethod]["deprecated"] = true;
+            }
+
             const returns = assocHelp.returns;
             if (returns === undefined) {
-                responses["200"] = {
+                responses["2XX"] = {
                     description: "Returns nothing"
                 };
                 console.log("==> void")
             } else if (typeof returns === "string") {
-                responses["200"] = {
+                responses["2XX"] = {
                     description: "Success",
                     content: {
                         "application/json": {
@@ -155,7 +167,7 @@ export const createPaths = async (client: SimpleClient) => {
                 const returnType = Object.keys(returns)[0];
                 console.log("==> Ref: " + returnType);
 
-                responses["200"] = {
+                responses["2XX"] = {
                     description: "Success",
                     content: {
                         "application/json": {
@@ -170,16 +182,9 @@ export const createPaths = async (client: SimpleClient) => {
             '$ref': '#/components/responses/UnauthorizedError'
         };
 
-        responses["403"] = {
-            '$ref': '#/components/responses/ForbiddenError'
-        };
-
         console.log("========================================");
     });
 
-
-    //console.log(consoleHelp.functions);
-    fs.writeFileSync("./dist/paths.json", JSON.stringify(someObject, null, 2));
     return someObject;
 }
 
@@ -205,6 +210,7 @@ const createLookupMapFromFullArguments = (args: any[]) => {
 
 const createType = (some: any) => {
     if (typeof some === "string") {
+        console.log("Creating type for: " + some);
         if (some.startsWith("vector of")) {
             return {
                 type: "array",
@@ -225,14 +231,16 @@ const createType = (some: any) => {
         if (f !== undefined) {
             return f;
         }
+    } else {
+        some = Object.keys(some)[0];
+        console.log("Creating type for: " + some);
     }
 
-    let ref = Object.keys(some)[0];
 
-    if (ref === "0") {
-        ref = "AnyType";
+    if (some === "0") {
+        some = "AnyType";
     }
     return {
-        "$ref": "#/components/schemas/" + ref
+        "$ref": "#/components/schemas/" + some
     }
 }
