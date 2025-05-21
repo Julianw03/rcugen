@@ -1,4 +1,5 @@
 import {riotToOpenApiPrimitiveObjects, SimpleClient} from "./index.js";
+import * as fs from "node:fs";
 
 
 interface HelpResponse {
@@ -128,16 +129,126 @@ export interface Type {
 }
 
 
-export const createSchema = async (client: SimpleClient) => {
+export const createSchema = async (
+    client: SimpleClient,
+    objectNameOverrides: Record<string, string> = {}
+) => {
 
-    const briefResponse = await client.request<HelpResponse>(
-        "GET",
-        "/help",
-        null,
-        {
-            "format": "Brief"
+    const createRef = (name: string): OpenApiReference => {
+        if (name === "" || name === " ") {
+            console.warn("Name is empty, (most likely map / array resolve issue) using AnyType as default");
+            name = "AnyType";
+        } else if (isArrayType(name) || isMapType(name)) {
+            console.warn("Nested type detected, using AnyType as default");
+            name = "AnyType";
+        } else if (name === '0') {
+            console.warn("Name is 0, probably a type resolution issue, using AnyType as default");
+            name = "AnyType";
+        } else if (name == undefined || name == 'object') {
+            console.warn(`Name is undefined or has an illegal value, using AnyType as default. Original name: ${name}`);
+            name = "AnyType";
         }
-    );
+
+        if (isPrimitiveType(name)) {
+            return handlePrimitive(name) as OpenApiReference;
+        }
+
+        name = objectNameOverrides[name] ?? name;
+
+        return {
+            $ref: `#/components/schemas/${name}`
+        }
+    }
+
+    const handleEnum = (value: ConsoleEnumType) => {
+        const openApiEnumSpec: OpenApiEnum = {
+            type: "string",
+            enum: value.values.map((val) => val.name)
+        }
+        return openApiEnumSpec;
+    }
+
+    const handlePrimitive = (value: PrimitiveType) => {
+        return riotToOpenApiPrimitiveObjects.get(value);
+    }
+
+
+
+    const handleArray = (value: ArrayType) => {
+        const openApiArraySpec: OpenApiArray = {
+            type: "array",
+            items: createRef(value.substring("vector of ".length))
+        }
+        return openApiArraySpec;
+    }
+
+    const handleMap = (value: MapType) => {
+        const openApiMapSpec: OpenApiObject = {
+            type: "object",
+            additionalProperties: createRef(value.substring("map of ".length))
+        }
+        return openApiMapSpec;
+    }
+
+    const handleObject = (value: ConsoleObjectType) => {
+
+        const d = value.fields.map((field => {
+            const [key, value] = Object.entries(field)[0];
+            const type = value.type;
+
+            let entry: string | OpenApiArray | OpenApiObject | OpenApiReference | OpenApiEnum;
+            if (isConsoleEnumType(type)) {
+                entry = handleEnum(type);
+            } else if (isPrimitiveType(type)) {
+                entry = handlePrimitive(type);
+            } else if (isArrayType(type)) {
+                entry = handleArray(type);
+            } else if (isMapType(type)) {
+                entry = handleMap(type);
+            } else {
+                entry = createRef(Object.keys(type)[0]);
+            }
+
+            return {[key]: entry};
+        })).reduce((acc, curr) => {
+            const [key, value] = Object.entries(curr)[0];
+            // @ts-ignore
+            acc[key] = value;
+            return acc;
+        }, {} as Record<string, OpenApiType>);
+
+        const objectSpec: OpenApiObject = {
+            type: "object",
+            properties: d,
+        }
+
+        return objectSpec;
+    }
+
+    const someToOpenApiObject = (originalTypeMap: Record<string, ConsoleType>): Map<string, OpenApiType> => {
+        const retMap = new Map<string, OpenApiType>();
+        const handleEntry = ([key, value]: [string, ConsoleType]) => {
+            key = objectNameOverrides[key] ?? key;
+            let entry;
+            if (isConsoleEnumType(value)) {
+                entry = handleEnum(value);
+            } else if (isPrimitiveType(value)) {
+                entry = handlePrimitive(value);
+            } else if (isArrayType(value)) {
+                entry = handleArray(value);
+            } else if (isConsoleObjectType(value)) {
+                entry = handleObject(value);
+            } else {
+                entry = {
+                    type: "object",
+                    properties: {}
+                }
+            }
+            retMap.set(key, entry);
+        }
+        Object.entries(originalTypeMap).forEach(handleEntry);
+        return retMap;
+    }
 
 
     console.log("Fetching \"Console\" Format for types, functions and events");
@@ -151,9 +262,6 @@ export const createSchema = async (client: SimpleClient) => {
         }
     )
 
-    // console.log(JSON.stringify(consoleResponse, null, 2));
-
-    const consoleTypes = Object.entries(consoleResponse.types);
     const schemas = someToOpenApiObject(consoleResponse.types);
     schemas.set("AnyType", {
             // @ts-ignore
@@ -217,114 +325,3 @@ interface OpenApiEnum {
 type OpenApiType = OpenApiPrimitive | OpenApiObject | OpenApiArray | OpenApiReference | OpenApiEnum;
 
 
-const createRef = (name: string): OpenApiReference => {
-    if (name === "" || name === " ") {
-        console.warn("Name is empty, (most likely map / array resolve issue) using AnyType as default");
-        name = "AnyType";
-    } else if (isArrayType(name) || isMapType(name)) {
-        console.warn("Nested type detected, using AnyType as default");
-        name = "AnyType";
-    } else if (name === '0') {
-        console.warn("Name is 0, probably a type resolution issue, using AnyType as default");
-        name = "AnyType";
-    } else if (name == undefined || name == 'object') {
-        console.warn(`Name is undefined or has an illegal value, using AnyType as default. Original name: ${name}`);
-        name = "AnyType";
-    }
-
-    if (isPrimitiveType(name)) {
-        return handlePrimitive(name) as OpenApiReference;
-    }
-    return {
-        $ref: `#/components/schemas/${name}`
-    }
-}
-
-const handleEnum = (value: ConsoleEnumType) => {
-    const openApiEnumSpec: OpenApiEnum = {
-        type: "string",
-        enum: value.values.map((val) => val.name)
-    }
-    return openApiEnumSpec;
-}
-
-const handlePrimitive = (value: PrimitiveType) => {
-    return riotToOpenApiPrimitiveObjects.get(value);
-}
-
-
-
-const handleArray = (value: ArrayType) => {
-    const openApiArraySpec: OpenApiArray = {
-        type: "array",
-        items: createRef(value.substring("vector of ".length))
-    }
-    return openApiArraySpec;
-}
-
-const handleMap = (value: MapType) => {
-    const openApiMapSpec: OpenApiObject = {
-        type: "object",
-        additionalProperties: createRef(value.substring("map of ".length))
-    }
-    return openApiMapSpec;
-}
-
-const handleObject = (value: ConsoleObjectType) => {
-
-    const d = value.fields.map((field => {
-        const [key, value] = Object.entries(field)[0];
-        const type = value.type;
-
-        let entry: string | OpenApiArray | OpenApiObject | OpenApiReference | OpenApiEnum;
-        if (isConsoleEnumType(type)) {
-            entry = handleEnum(type);
-        } else if (isPrimitiveType(type)) {
-            entry = handlePrimitive(type);
-        } else if (isArrayType(type)) {
-            entry = handleArray(type);
-        } else if (isMapType(type)) {
-            entry = handleMap(type);
-        } else {
-            entry = createRef(Object.keys(type)[0]);
-        }
-
-        return {[key]: entry};
-    })).reduce((acc, curr) => {
-        const [key, value] = Object.entries(curr)[0];
-        // @ts-ignore
-        acc[key] = value;
-        return acc;
-    }, {} as Record<string, OpenApiType>);
-
-    const objectSpec: OpenApiObject = {
-        type: "object",
-        properties: d,
-    }
-
-    return objectSpec;
-}
-
-const someToOpenApiObject = (originalTypeMap: Record<string, ConsoleType>): Map<string, OpenApiType> => {
-    const retMap = new Map<string, OpenApiType>();
-    const handleEntry = ([key, value]: [string, ConsoleType]) => {
-        let entry;
-        if (isConsoleEnumType(value)) {
-            entry = handleEnum(value);
-        } else if (isPrimitiveType(value)) {
-            entry = handlePrimitive(value);
-        } else if (isArrayType(value)) {
-            entry = handleArray(value);
-        } else if (isConsoleObjectType(value)) {
-            entry = handleObject(value);
-        } else {
-            entry = {
-                type: "object",
-                properties: {}
-            }
-        }
-        retMap.set(key, entry);
-    }
-    Object.entries(originalTypeMap).forEach(handleEntry);
-    return retMap;
-}

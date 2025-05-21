@@ -74,6 +74,10 @@ async function run() {
         secret
     );
 
+    const objectNameOverrides = JSON.parse(fs.readFileSync("./objectNameOverrides.json", "utf-8"));
+
+    console.log("Object name overrides: ", objectNameOverrides);
+
 
     const appInfo = await client.request("GET", "/riotclient/v1/app-info");
 
@@ -81,8 +85,8 @@ async function run() {
     const version = appInfo["version"] ?? "Unknown";
     const sdkVersion = appInfo["sdkVersion"] ?? "Unknown";
 
-    const schemas = await createSchema(client);
-    const pathsOut = await createPaths(client);
+    const schemas = await createSchema(client, objectNameOverrides);
+    const pathsOut = await createPaths(client, objectNameOverrides);
 
     const openApiObject = {
         openapi: "3.0.0",
@@ -91,11 +95,6 @@ async function run() {
             version: version,
             description: `Created with SDK - Version ${sdkVersion}`
         },
-        servers: [
-            {
-                url: client.baseUrl
-            }
-        ],
         paths: pathsOut,
         components: {
             securitySchemes: {
@@ -112,13 +111,15 @@ async function run() {
             schemas: schemas
         },
 
-        security: {
-            basicAuth: []
-        }
+        security: [
+            {
+                basicAuth: []
+            }
+        ]
     }
 
     fs.mkdirSync("./out", {recursive: true});
-    fs.writeFileSync("./out/openapi.json", JSON.stringify(openApiObject, null, 2), {
+    fs.writeFileSync("./out/riot-client-openapi.json", JSON.stringify(openApiObject, null, 2), {
         flag: "w"
     });
 }

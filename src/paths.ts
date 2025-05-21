@@ -1,8 +1,48 @@
-import {SimpleClient} from "./index.js";
-import * as fs from "node:fs";
-import {riotToOpenApiPrimitiveObjects} from "./index.js";
+import {riotToOpenApiPrimitiveObjects, SimpleClient} from "./index.js";
 
-export const createPaths = async (client: SimpleClient) => {
+export const createPaths = async (
+    client: SimpleClient,
+    objectNameOverrides: Record<string, string> = {}
+) => {
+    const createType = (some: any) => {
+        if (typeof some === "string") {
+            console.log("Creating type for: " + some);
+            if (some.startsWith("vector of")) {
+                return {
+                    type: "array",
+                    items: createType(some.substring("vector of ".length))
+                }
+            } else if (some.startsWith("map of")) {
+                return {
+                    type: "object",
+                    additionalProperties: createType(some.substring("map of ".length))
+                }
+            } else if (some === "object" || some === " " || some === "") {
+                return {
+                    $ref: "#/components/schemas/AnyType"
+                }
+            }
+
+            const f = riotToOpenApiPrimitiveObjects.get(some);
+            if (f !== undefined) {
+                return f;
+            }
+        } else {
+            some = Object.keys(some)[0];
+            console.log("Creating type for: " + some);
+        }
+
+
+        some = objectNameOverrides[some] || some;
+
+        if (some === "0") {
+            some = "AnyType";
+        }
+        return {
+            "$ref": "#/components/schemas/" + some
+        }
+    }
+
     const consoleHelp = await client.request<any>(
         "GET",
         "/help",
@@ -82,7 +122,7 @@ export const createPaths = async (client: SimpleClient) => {
                 } else if (paramName.startsWith("<") && paramName.endsWith(">")) {
                     paramName = paramName.slice(1, -1);
                     //Sometimes path params are noted like {+path}
-                    if (assocHelp.url.replace('+','').includes("{" + paramName + "}")) {
+                    if (assocHelp.url.replace('+', '').includes("{" + paramName + "}") || assocHelp.http_method === "DELETE" || assocHelp.http_method === "GET") {
                         paramToLocation[paramName] = "path";
                     } else {
                         paramToLocation[paramName] = "body";
@@ -206,41 +246,4 @@ const createLookupMapFromFullArguments = (args: any[]) => {
         acc[name] = current;
         return acc;
     }, {})
-}
-
-const createType = (some: any) => {
-    if (typeof some === "string") {
-        console.log("Creating type for: " + some);
-        if (some.startsWith("vector of")) {
-            return {
-                type: "array",
-                items: createType(some.substring("vector of ".length))
-            }
-        } else if (some.startsWith("map of")) {
-            return {
-                type: "object",
-                additionalProperties: createType(some.substring("map of ".length))
-            }
-        } else if (some === "object" || some === " " || some === "") {
-            return {
-                $ref: "#/components/schemas/AnyType"
-            }
-        }
-
-        const f = riotToOpenApiPrimitiveObjects.get(some);
-        if (f !== undefined) {
-            return f;
-        }
-    } else {
-        some = Object.keys(some)[0];
-        console.log("Creating type for: " + some);
-    }
-
-
-    if (some === "0") {
-        some = "AnyType";
-    }
-    return {
-        "$ref": "#/components/schemas/" + some
-    }
 }
