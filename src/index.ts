@@ -80,9 +80,10 @@ async function run() {
 
 
     const appInfo = await client.request("GET", "/riotclient/v1/app-info");
+    // const appInfo = {}
 
     const namePrefix = appInfo["name"] ?? "Unknown";
-    const version = appInfo["version"] ?? "Unknown";
+    const version = appInfo["version"] ?? "0.0.1";
     const sdkVersion = appInfo["sdkVersion"] ?? "Unknown";
 
     const schemas = await createSchema(client, objectNameOverrides);
