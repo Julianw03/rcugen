@@ -96,12 +96,25 @@ async function run() {
             version: version,
             description: `Created with SDK - Version ${sdkVersion}`
         },
+        servers: [
+            {
+                url: "https://127.0.0.1:{port}",
+                description: "Riot Client API",
+                variables: {
+                    port: {
+                        default: "0",
+                        description: "Local port of the Riot Client"
+                    }
+                }
+            }
+        ],
         paths: pathsOut,
         components: {
             securitySchemes: {
                 basicAuth: {
                     type: "http",
-                    scheme: "basic"
+                    scheme: "basic",
+                    description: "Basic authentication using the Riot Client credentials, username is 'riot' and password is the generated secret."
                 }
             },
             responses: {
